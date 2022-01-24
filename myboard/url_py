@@ -1,0 +1,22 @@
+# myboard/urls.py
+from django.urls import path
+from django.contrib.auth import views as auth_views
+
+from . import views
+
+urlpatterns = [
+    path('', views.index, name='index'),
+    path('<int:room_name>/', views.room, name='room'),
+    path('api/holder/', views.GetAllHolerAPIView.as_view()),
+    path('api/status/allboard/', views.GetAllBoardsByHolderAPIView.as_view()),
+    path('api/status/board/', views.GetBoards.as_view()),
+    path('api/status/boardsharing/', views.GetBoardsShareControl.as_view()),
+    path('api/status/pcd/', views.GetStatusAllBoardsByPCDAPIView.as_view()),
+    path('api/status/labpc/', views.GetStatusAllBoardsByLABPCAPIView.as_view()),
+    path('api/control/board/', views.GetToControlBoardByBoardIDAPIView.as_view()),
+    path('api/cpld/', views.GetCPLDAPIView.as_view()),
+    path('api/info/<int:board_id>/', views.GetInfoByBoardIDAPIView.as_view()),
+    path('api/token/', views.GetTokenAPIView.as_view()),
+    # path('login/',views.signin, name="login"),
+    # path('logout/',views.signout, name="logout"),
+]

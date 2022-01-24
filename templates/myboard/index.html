@@ -1,0 +1,47 @@
+{% extends 'myboard/base.html' %}
+{% block content %}
+<div class="container-fluid">
+    {% csrf_token %}
+    <table class="table table-striped table-sm" id="my_boards">
+        <thead>
+            <tr>
+                <th>Board name</th>
+                <th>Board type</th>
+                <th>SN</th>
+                <th>Hoder</th>
+                <th>PCD IP</th>
+                <th>LABPC ID</th>
+                <th>Relay power ID</th>
+                <th>Is Using</th>
+                <th>Is Sharing</th>
+                <th>Power Status</th>
+                <th>BoardLAB ID</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for board in boards %}
+        <tr>
+            <td>
+                <a href='/myboard/{{board.LABPCOwner.id}}/{{board.id}}/'>
+                    {{board.displayName}}
+                </a>
+            </td>
+            <td>{{board.boardType}}</td>
+            <td>{{board.boardSerialNumber}}</td>
+            <td>{{board.holder}}</td>
+            <td>{{board.PCDOwner.ipaddr}}</td>
+            <td>{{board.LABPCOwner.id}}</td>
+            <td>{{board.powerSwitchRelayNumber}}</td>
+            <td>{{board.isUsing}}</td>
+            <td>{{board.isShareControl}}</td>
+            <td>{% if board.statusPower == 0 %} OFF {% else %} ON {% endif %}</td>
+            <td>{{board.boardLabID}}</td>
+
+
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+</div>
+{% endblock %}

@@ -1,0 +1,69 @@
+from rest_framework import serializers
+from .models import Holder,Board
+
+class GetAllHolderSerializer(serializers.ModelSerializer):
+
+    def to_representation(self, instance):
+        return {
+            'id': instance.id,
+            'name': instance.user.username,
+            'numberOfBoard': Board.objects.filter(holder__id=instance.id).count()
+        }
+#get board
+class GetAllBoardsOfByHolderSerializer(serializers.ModelSerializer):
+    def to_representation(self, instance):
+        return {
+            'user_id': instance.id,
+            'holder': instance.user.username,
+            'boards': [{"id":board.id,"name":str(board.name),'stt':str("ON" if board.statusPower == True else "OFF")} for board in instance.board_set.all()]
+        }
+
+#status
+class GetStatusAllBoardsByPCDSerializer(serializers.ModelSerializer): 
+    def to_representation(self, instance):
+        return {
+            'id': instance.id,
+            'labpc': instance.LABPCOwner.user.username,
+            'boards': [{"id":board.id,"name":str(board.name),'stt':str("ON" if board.statusPower == True else "OFF")} for board in instance.board_set.all()]
+        }
+class GetStatusAllBoardsByLABPCSerializer(serializers.ModelSerializer):
+    def to_representation(self, instance):
+        return {
+            'id': instance.id,
+            'PCD':  [{"id":board.PCDOwner.id,"name":str(board.PCDOwner.name)} for board in instance.board_set.all()],
+            'boards': [{"id":board.id,"name":str(board.name),'stt':str("ON" if board.statusPower == True else "OFF")} for board in instance.board_set.all()]
+        }
+class GetStatusBoardByBoardIDSerializer(serializers.ModelSerializer):
+    def to_representation(self, board):
+        return {
+            'board_id': board.id,
+            'holder': board.holder.user.username,
+            'statusPower': "ON" if board.statusPower == True else "OFF"
+        }
+class GetBoardShareControlSerializer(serializers.ModelSerializer):
+    def to_representation(self, board):
+        return {
+            'board_id': board.id,
+            'holder': board.holder.user.username,
+            'statusPower': "ON" if board.statusPower == True else "OFF",
+            'isUsing': board.isUsing
+        }
+class GetInfoByBoardIDSerializer(serializers.ModelSerializer):
+
+    def to_representation(self, board):
+        return {
+            'board_id': board.id,
+            'holder': board.holder.user.username,
+            'PCDOwner': board.PCDOwner.name,
+            'LABPC': board.LABPCOwner.user.username,
+            'statusPower': "ON" if board.statusPower == True else "OFF"
+        }
+class GetToControlBoardByBoardIDSerializer(serializers.ModelSerializer):
+    def to_representation(self, board):
+        return {
+            'board_id': board.id,
+            'holder': board.holder.user.username,
+            'PCDOwner': board.PCDOwner.name,
+            'LABPCOwner': board.LABPCOwner.user.username,
+            'statusPower': "ON" if board.statusPower == True else "OFF"
+        }

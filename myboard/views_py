@@ -1,0 +1,427 @@
+# myboard/views.py
+from asyncio.events import Handle
+from django.shortcuts import render
+from django.core.serializers import serialize
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
+import requests
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import GetAllHolderSerializer,GetAllBoardsOfByHolderSerializer,GetStatusAllBoardsByPCDSerializer
+from .serializers import GetStatusAllBoardsByLABPCSerializer,GetStatusBoardByBoardIDSerializer,GetInfoByBoardIDSerializer
+from .serializers import GetToControlBoardByBoardIDSerializer,GetBoardShareControlSerializer
+from .models import Holder,Board,LABPC,PCD
+from rest_framework.permissions import IsAuthenticated,IsAdminUser,AllowAny 
+from rest_framework.authtoken.models import Token
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
+
+
+class GetAllHolerAPIView(APIView):
+
+    permission_classes = [IsAuthenticated&IsAdminUser]
+    def get(self, request):
+        list_holder = Holder.objects.all()
+        mydata = GetAllHolderSerializer(list_holder,many=True)
+        return Response(data = mydata.data,status=status.HTTP_200_OK)
+
+#get board
+class GetAllBoardsByHolderAPIView(APIView):
+
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        print(request.user)
+        try:
+            h = Holder.objects.get(user=request.user)
+            print(h)
+            mydata = GetAllBoardsOfByHolderSerializer(h)
+            return Response(data = mydata.data,status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(str(e),status=status.HTTP_400_BAD_REQUEST)
+
+#status
+class GetStatusAllBoardsByPCDAPIView(APIView):
+
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        print(request.user)
+        pcd_id = request.GET.get('pcd_id', None)
+        print(pcd_id)
+        p = PCD.objects.get(id=pcd_id)
+        mydata = GetStatusAllBoardsByPCDSerializer(p)
+        return Response(data = mydata.data,status=status.HTTP_200_OK)
+class GetStatusAllBoardsByLABPCAPIView(APIView):
+
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        try:
+            labpc_id = request.GET.get('labpc_id', None)
+            print(labpc_id)
+            l = LABPC.objects.get(id=labpc_id)
+            mydata = GetStatusAllBoardsByLABPCSerializer(l)
+            return Response(data = mydata.data,status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(str(e),status=status.HTTP_400_BAD_REQUEST)
+      
+class GetBoards(APIView): #chech nhung board cua user
+
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        print(request.user)
+        try:
+            board_id = request.GET.get('board_id', None) #parse ?board_id
+            print(board_id)
+            b = Board.objects.get(id=board_id)
+            mydata = GetStatusBoardByBoardIDSerializer(b)
+            return Response(data = mydata.data,status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(str(e),status=status.HTTP_400_BAD_REQUEST)
+
+class GetBoardsShareControl(APIView): #check any board ko thuoc cua user co the dung chare 
+
+    authentication_classes = []
+    def get(self, request):
+        print(request.user)
+        try:
+            board_id = request.GET.get('board_id', None) #parse ?board_id
+            board_name = request.GET.get('board_name', None) 
+            labpc_id = request.GET.get('labpc_id', None) 
+            pcd_id = request.GET.get('pcd_id', None) 
+            index = 0 
+            if board_id != None:
+                bs = Board.objects.get(id=board_id,isShareControl = True)
+                index = 1
+            elif labpc_id != None:
+                bs = Board.objects.filter(LABPCOwner__id=labpc_id,isShareControl = True)
+                index = 2
+            elif pcd_id != None:
+                bs = Board.objects.filter(PCDOwner__id=pcd_id,isShareControl = True)
+                index = 3
+            elif board_name != None:
+                bs = Board.objects.filter(name=board_name,isShareControl = True)
+                index = 4
+            else:
+                raise ValueError("No input")
+            print(index)
+            print(bs)
+            mydata = GetBoardShareControlSerializer(bs,many=True if index != 1 else False)
+            return Response(data = mydata.data,status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(str(e),status=status.HTTP_400_BAD_REQUEST)
+class GetTokenAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        print(request.user)
+        token = Token.objects.get_or_create(user=request.user)
+        print(token)
+        return Response({"token":token[0].key},status=status.HTTP_200_OK)
+
+
+class GetInfoByBoardIDAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request,board_id):
+        print(request.user)
+        b = Board.objects.get(id=board_id)
+        mydata = GetInfoByBoardIDSerializer(b)
+        return Response(data = mydata.data,status=status.HTTP_200_OK)
+
+class GetToControlBoardByBoardIDAPIView(APIView):
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        print("request from "+ str(request.user.username))
+        try:
+            board_id = request.GET.get('board_id', None) #parse ?board_id
+            power = request.GET.get('power', None) #parse ?board_id
+            b = Board.objects.get(id=board_id)
+            room = 'labpc_' + str(b.LABPCOwner.id)
+            pcd_id =  b.PCDOwner.id
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                room,
+                {
+                    'type': 'labpc_message',
+                    'message': {"cmd":"power","arg":power,'board_id':board_id,'pcd_id':pcd_id}, #duoc lay ra bang cah goi event["..."]
+                    'from': "fromView",
+                    'evt': 'request',
+                    'handle':'0',
+                    'user' : request.user.username,
+                    'userid': request.user.id,
+                }
+            )
+            mydata = GetToControlBoardByBoardIDSerializer(b)
+            print(mydata.data)
+            return Response(data = mydata.data,status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(str(e),status=status.HTTP_400_BAD_REQUEST)
+#TODO
+class GetCPLDAPIView(APIView):
+    def get(self, request):
+        try:
+            labpc_id = request.GET.get('labpc_id', None) #parse ?board_id
+            cmd = request.GET.get('cmd', None) #parse ?board_id
+            room = 'labpc_' + str(labpc_id)
+            print(room)
+            handle_count =  0
+            handle = handle_count + room
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                room,
+                {
+                    'type': 'userview_message',
+                    'message': {"cpld":cmd}, #duoc lay ra bang cah goi event["..."]
+                    'from': "fromView",
+                    'handle': handle
+                }
+            )
+            return Response(data = "mydata.data",status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(str(e),status=status.HTTP_400_BAD_REQUEST)
+def index(request):
+    return render(request, 'myboard/index.html')
+
+def room(request, room_name):
+    token = Token.objects.get(user=request.user)
+    return render(request, 'myboard/room.html', {
+        'room_name': room_name,
+        'my_token': token.key
+    })
+
+
+
+class GetBoardsAuthAPI(APIView): #check any board ko thuoc cua user co the dung chare 
+    """Get al"""
+    
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        print(request.user)
+        try:
+            board_id = request.GET.get('board_id', None) #parse ?board_id
+            board_name = request.GET.get('board_name', None) 
+            labpc_id = request.GET.get('labpc_id', None) 
+            pcd_id = request.GET.get('pcd_id', None)
+            all = request.GET.get('all', None) 
+            index = 0 
+            if board_id != None:
+                bs = Board.objects.get(id=board_id, isShareControl = True,isActivate =True)
+                index = 1
+            elif labpc_id != None:
+                bs = Board.objects.filter(LABPCOwner__id=labpc_id, isShareControl = True, isActivate =True)
+                index = 2
+            elif pcd_id != None:
+                bs = Board.objects.filter(PCDOwner__id=pcd_id, isShareControl = True, isActivate =True)
+                index = 3
+            elif board_name != None:
+                bs = Board.objects.filter(name=board_name, isShareControl = True, isActivate =True)
+                index = 4
+            else:
+                h = Holder.objects.get(user=request.user)
+                print(h)
+                if all != None:
+                    bs = Board.objects.filter(holder=h)
+                else :
+                    bs = Board.objects.filter(holder=h, isActivate=True)
+                index = 5
+            mydata = GetBoardSerializer(bs, many=True if index != 1 else False)
+            return Response(data = mydata.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
+
+
+
+            from django.shortcuts import render
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import SetControlBoardByBoardIDSerializer, GetBoardsSerializer
+from .models import Holder, Board
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authtoken.models import Token
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+from django.contrib.auth.models import AnonymousUser
+
+
+def get_user_by_request(request):
+    """Get user by request"""
+
+    try:
+        lines = iter(request.META['HTTP_AUTHORIZATION'].split())
+        for line in lines:
+            if line == 'token':
+                token_key = next(lines)
+        token = Token.objects.get(key=token_key)
+        return token.user
+    except Token.DoesNotExist:
+        return AnonymousUser()
+
+
+class GetBoardsAPI(APIView):
+    """Get list of shared boards."""
+
+    authentication_classes = []
+    
+    def get(self, request):
+        print(request.user)
+        try:
+            board_id = request.GET.get('board_id', None)
+            board_name = request.GET.get('board_name', None) 
+            labpc_id = request.GET.get('labpc_id', None) 
+            pcd_id = request.GET.get('pcd_id', None) 
+            board_type = request.GET.get('board_type', None)
+            index = 0 
+            if board_id != None:
+                bs = Board.objects.get(id=board_id, isShareControl = True,isActivate =True)
+                index = 1
+            elif labpc_id != None:
+                bs = Board.objects.filter(LABPCOwner__id=labpc_id, isShareControl = True, isActivate =True)
+                index = 2
+            elif pcd_id != None:
+                bs = Board.objects.filter(PCDOwner__id=pcd_id, isShareControl = True, isActivate =True)
+                index = 3
+            elif board_type != None:
+                bs = Board.objects.filter(boardType=board_type, isShareControl = True, isActivate =True)
+                index = 4
+            else:
+                bs = Board.objects.filter(isShareControl = True, isActivate =True)
+            mydata = GetBoardsSerializer(bs,many=True if index != 1 else False)
+            return Response(data = mydata.data,status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(str(e),status=status.HTTP_400_BAD_REQUEST)
+            
+
+class SetLockBoardAPI(APIView):
+    """Set lock board"""
+
+    authentication_classes = []
+
+    def get(self, request):
+        try:
+            board_id = request.GET.get('board_id', None)
+            usingby = request.GET.get('usingby', None)
+            b = Board.objects.get(id=board_id,isActivate =True, isUsing = False)
+            if  not b.isShareControl:
+                user = get_user_by_request(request) #auth
+                h = Holder.objects.get(user=user)
+                usingby = user.username
+                if b.holder != h :
+                    raise ValueError("Board is not shared or used")
+            b.usingby =  usingby
+            b.save()
+            return Response("OK",status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(str(e),status=status.HTTP_200_OK)
+
+
+class SetUnlockBoardAPI(APIView):
+    """Set unlock board"""
+
+    authentication_classes = []
+
+    def get(self, request):
+        try:
+            board_id = request.GET.get('board_id', None)
+            usingby = request.GET.get('usingby', None)
+            b = Board.objects.get(id=board_id,isActivate =True, isUsing = True)
+            if b.usingby!= usingby:
+                raise ValueError("Wrong signed")
+            if  not b.isShareControl:
+                user = get_user_by_request(request) #auth
+                h = Holder.objects.get(user=user)
+                if b.holder != h or b.usingby != user.username or b.usingby!= usingby:
+                    raise ValueError("Board is not shared or used")
+            b.isUsing = False
+            b.usingby =  None
+            b.save()
+            return Response("OK",status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(str(e),status=status.HTTP_200_OK)
+
+
+class GetTokenAPI(APIView):
+    """Get user token."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        print(request.user)
+        token = Token.objects.get_or_create(user=request.user)
+        print(token)
+        return Response({"token": token[0].key}, status=status.HTTP_200_OK)
+
+
+class SetControlBoardByBoardIDAPI(APIView):
+    """Set control board by board ID."""
+    
+    authentication_classes = []
+
+    def get(self, request):
+        print("request from " + str(request.user.username))
+        try:
+            board_id = request.GET.get('board_id', None)
+            usingby = request.GET.get('usingby', None)
+            b = Board.objects.get(id=int(board_id))
+            if not b.isActivate :
+                raise ValueError("Board is not activate")
+            if b.usingby!= usingby:
+                raise ValueError("Wrong signed")
+            if not b.isShareControl:
+                raise ValueError("Board is not shared or used")
+            
+            power = request.GET.get("power", None)
+            room = "labpc_" + str(b.LABPCOwner.id)
+            pcd_id = b.PCDOwner.id
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                room,
+                {
+                    "type": "labpc_message",
+                    "message": {
+                        "cmd": "power",
+                        "arg": power,
+                        "board_id": board_id,
+                        "pcd_id": pcd_id
+                    },
+                    "from": "fromView",
+                    "evt": "request",
+                    "handle": "0",
+                    "user": request.user.username,
+                    "userid": request.user.id,
+                }
+            )
+            mydata = SetControlBoardByBoardIDSerializer(b)
+            print(mydata.data)
+            return Response(data=mydata.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
+
+
+def index(request):
+    """render for index page.
+
+    Args:
+        request: request message.
+
+    """
+    return render(request, "myboard/index.html")
+
+
+def room(request, room_name):
+    """render for labPC room pages.
+
+    Args:
+        request: request message.
+        room_name: generate from labPC ID.
+
+    """
+    token = Token.objects.get(user=request.user)
+    return render(
+        request, "myboard/room.html", {
+            "room_name": room_name,
+            "my_token": token.key
+        }
+    )
