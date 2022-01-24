@@ -3,3 +3,4 @@ channels
 djangorestframework
 requests
 prettytable
+dj-database-url
