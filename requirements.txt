@@ -4,3 +4,4 @@ djangorestframework
 requests
 prettytable
 dj-database-url
+psycopg2
