@@ -118,7 +118,10 @@ class GetShareBoardsAPI(APIView):
                 link = "http://" + str(b.LABPCOwner.ipaddr) + ":" + str(b.LABPCOwner.port) + "/api/status/boards/?"
                 link = gen_url(link,{})
                 print(link)
-                r = requests.get(link).json()
+                try:
+                    r = requests.get(link).json()
+                except:
+                    r = {"ok": False}
                 if r.get("ok") :
                     ls.append(b.LABPCOwner.id)
                     rbs = r.get("data")
