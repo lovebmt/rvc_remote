@@ -7,11 +7,10 @@
             <tr>
                 <th>Board name</th>
                 <th>Board type</th>
-                <th>SN</th>
+                <th>Board UID</th>
                 <th>Hoder</th>
                 <th>PCD IP</th>
                 <th>LABPC ID</th>
-                <th>Relay power ID</th>
                 <th>Is Using</th>
                 <th>Is Sharing</th>
                 <th>Power Status</th>
@@ -27,11 +26,10 @@
                 </a>
             </td>
             <td>{{board.boardType}}</td>
-            <td>{{board.boardSerialNumber}}</td>
+            <td>{{board.id}}</td>
             <td>{{board.holder}}</td>
             <td>{{board.PCDOwner.ipaddr}}</td>
             <td>{{board.LABPCOwner.id}}</td>
-            <td>{{board.powerSwitchRelayNumber}}</td>
             <td>{{board.isUsing}}</td>
             <td>{{board.isShareControl}}</td>
             <td>{% if board.statusPower == 0 %} OFF {% else %} ON {% endif %}</td>

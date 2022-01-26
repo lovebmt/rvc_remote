@@ -213,7 +213,11 @@ class Board(models.Model):
 
         POWER_OFF = 0
         POWER_ON = 1
+    class StatusBoot(models.IntegerChoices):
+        """type of power status."""
 
+        BOOT = 0
+        UNBOOT = 1
     displayName = models.CharField(max_length=255)
     boardLabID =  models.IntegerField(default = -1)
     boardType = models.CharField(max_length=255,choices=BOARD_TYPE_CHOICES,default=UNK)
@@ -229,6 +233,7 @@ class Board(models.Model):
     isShareControl = models.BooleanField(default=True)
     usingBy = models.CharField(default = None ,max_length=255,editable=False,null=True,blank = True)
     statusPower = models.IntegerField(default=StatusPower.POWER_OFF,choices=StatusPower.choices)
+    statusBoot = models.IntegerField(default=StatusBoot.BOOT,choices=StatusBoot.choices)
     anonymousToken = models.CharField(default = None ,max_length=255,editable=False,null=True,blank = True)
 
     def save(self, *args, **kwargs):

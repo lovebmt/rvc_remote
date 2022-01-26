@@ -50,11 +50,16 @@ class GetBoardsAPI(APIView):
     def get(self, request):
         print(request.user)
         return Response(data = {"indev"},status=status.HTTP_200_OK)
-def getPower(power):
-    if power in [True, "ON", 'on']:
+def getStatusControl(control):
+    control = control.lower()
+    if control in ['on']:
         return Board.StatusPower.POWER_ON
-    else :
+    elif control in ['off']:
         return Board.StatusPower.POWER_OFF
+    elif control in ["boot"]:
+        return Board.StatusBoot.BOOT
+    elif control in ["unboot"]:
+        return Board.StatusBoot.UNBOOT
 
 class GetShareBoardsAPI(APIView):
     """Get list of shared boards."""
@@ -115,30 +120,31 @@ class GetShareBoardsAPI(APIView):
             for b in bs:
                 if b.LABPCOwner.id in ls:
                     continue
-                link = "http://" + str(b.LABPCOwner.ipaddr) + ":" + str(b.LABPCOwner.port) + "/api/status/boards/?"
-                link = gen_url(link,{})
-                print(link)
+                url = "http://%s:%d/api/status/boards/?" %(str(b.LABPCOwner.ipaddr),int(b.LABPCOwner.port))
                 try:
-                    r = requests.get(link).json()
+                    r = requests.get(url).json()
                 except:
                     r = {"ok": False}
                 if r.get("ok") :
                     ls.append(b.LABPCOwner.id)
                     rbs = r.get("data")
                     for rb in rbs:
-                        print(rb)
                         try:
                             _b = Board.objects.get(LABPCOwner__id = b.LABPCOwner.id, boardLabID = rb["board_lab_id"])
-                            _b.statusPower = getPower(rb["power"])
+                            if rb["power"] is not None:
+                                _b.statusPower = getStatusControl(rb["power"])
+                            if rb["boot"] is not None:
+                                _b.statusBoot = getStatusControl(rb["boot"])
                             _b.save()
                         except Board.DoesNotExist:
                             print ("Labpc[{0} ip={2}] not exist boardLabID[{1}]".format(b.LABPCOwner.id,rb["board_lab_id"],b.LABPCOwner.ipaddr))
-                #save
+                        except:
+                            print("LAPBC Respose wrong format")
             bs = Board.objects.filter(**sort_params,  isShareControl = True,isActivate =True)
             mydata = GetBoardsSerializer(bs,many=True)
             return Response(data = mydata.data,status=status.HTTP_200_OK)
         except Exception as e:
-            return Response(str(e),status=status.HTTP_400_BAD_REQUEST)
+            return Response({"ok": False,"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
 
 
 class SetLockBoardAPI(APIView):
@@ -152,19 +158,19 @@ class SetLockBoardAPI(APIView):
             sort_using_by = request.GET.get('using_by', None)
 
             b = Board.objects.get(id=sort_board_id,isActivate =True)
-            resp = {"ok": True,"stuff": "This is good"}
+            resp = {"ok": True,"message": "This is good"}
             if sort_using_by == None:
                 resp = {"ok": True,"warning": "Should have input using_by"}
             if  not b.isShareControl:
-                raise ValueError( {"ok": False,"error": "Board is not shared or used"})
+                raise ValueError("Board is not shared or used")
             if b.usingBy is not None:
-                raise ValueError( {"ok": False,"error": "Board is using by %s."%(b.usingBy)})
+                raise ValueError("Board is using by %s."%(b.usingBy))
             b.usingBy =  sort_using_by
             b.isUsing = True
             b.save()
             return Response(resp,status=status.HTTP_200_OK)
         except Exception as e:
-            return Response(str(e),status=status.HTTP_200_OK)
+            return Response({"ok": False,"error":str(e)},status=status.HTTP_200_OK)
 
 
 class SetUnlockBoardAPI(APIView):
@@ -177,17 +183,17 @@ class SetUnlockBoardAPI(APIView):
             sort_board_id = request.GET.get('board_id', None)
             sort_using_by = request.GET.get('using_by', None)
             b = Board.objects.get(id=sort_board_id,isActivate =True)
-            resp = {"ok": True,"stuff": "This is good"}
+            resp = {"ok": True,"message": "This is good"}
             if b.usingBy!= sort_using_by:
-                raise ValueError( {"ok": False,"error": "Board is using by %s."%(b.usingBy)})
+                raise ValueError("Board is using by %s."%(b.usingBy))
             if b.isUsing is False:
-                raise ValueError( {"ok": False,"error": "Board is not locking"})
+                raise ValueError("Board is not locking")
             b.usingBy =  None
             b.isUsing = False
             b.save()
             return Response(resp,status=status.HTTP_200_OK)
         except Exception as e:
-            return Response(str(e),status=status.HTTP_200_OK)
+            return Response({"ok": False,"error":str(e)},status=status.HTTP_200_OK)
 
 
 class GetTokenAPI(APIView):
@@ -201,45 +207,52 @@ class GetTokenAPI(APIView):
         print(token)
         return Response({"token": token[0].key}, status=status.HTTP_200_OK)
 
-class SetControlBoardByBoardIDAPI(APIView):
+class SetControlBoardAPI(APIView):
     """Set control board by board ID."""
     authentication_classes = [SessionAuthentication]
 
     def get(self, request):
         print("request from " + str(request.user.username) if request.user.id else "request from anonymous")
         try:
-            resp = {"ok": True,"stuff": "This is good"}
+            resp = {"ok": True,"message": "This is good"}
             sort_board_id = request.GET.get('board_id', None)
             sort_using_by = request.GET.get('using_by', None)
             sort_labpc_id = request.GET.get('labpc_id', None)
             sort_pcd_ip = request.GET.get('pcd_ip', None)
             sort_board_lab_id = request.GET.get('board_lab_id', None)
             sort_relay_id = request.GET.get('relay_id', None)
-            power = request.GET.get("power", None)
-            if power is None :
-                raise ValueError({"ok": False,"error": "Need input power"})
+            control = request.GET.get("control", None) #on or off
+
+            if control is None  or control.lower() not in ['off', 'on','boot','unboot']:
+                raise ValueError("Need input control=on/off/boot/unboot")
             if None not in [sort_board_lab_id,sort_labpc_id] and all(ele == None for ele in [sort_relay_id,sort_board_id,sort_pcd_ip]):
                 #lab and board id of lab
                 try:
                     l = LABPC.objects.get(id=int(sort_labpc_id))
                     b = Board.objects.filter(LABPCOwner=l,boardIdOnLab=sort_board_lab_id)
                 except ObjectDoesNotExist:
-                    raise ValueError({"ok": False,"error": "Labpc {0} is not exist or Board ID {1} in LABPC[{0}] not exist.".format(sort_labpc_id,sort_board_id_in_lab)})
+                    raise ValueError("Labpc {0} is not exist or Board ID {1} in LABPC[{0}] not exist.".format(sort_labpc_id,sort_board_id_in_lab))
                 
-                link = "http://" + l.ipaddr + ":" + l.port + "/api/control/boards/"
-                link = gen_url(link,{"cmd":"power","arg":power,"labpc_id":sort_labpc_id,"board_lab_id":sort_board_lab_id})
-                r = requests.get(link).json()
-                resp["stuff"] = r
+                url = "http://%s:%d/api/control/boards/" % (str(l.ipaddr),int(l.port))
+                params ={}
+                set_if_not_none(params, 'cmd','control')
+                set_if_not_none(params, 'arg',control)
+                set_if_not_none(params, 'board_lab_id',sort_board_lab_id)
+                set_if_not_none(params, 'labpc_id',sort_labpc_id)
+                try:
+                    r = requests.get(url,params=params).json()
+                    resp["data"] = r
+                except:
+                    raise ValueError("Failed request to %s" % url)
                 print(json.dumps(resp,depth=4, sort_keys=True))
                 return Response(resp, status=status.HTTP_200_OK)
-
             if None not in [sort_relay_id,sort_pcd_ip,sort_labpc_id] and sort_board_id is None:
                 #lab id + pcd ip + relay id
                 # send request to labpc ont care board type
                 try:
                     l = LABPC.objects.get(id=int(sort_labpc_id))
                 except ObjectDoesNotExist:
-                    raise ValueError({"ok": False,"error": "Labpc %s is not exist"%(sort_labpc_id)})
+                    raise ValueError("Labpc %s is not exist"%(sort_labpc_id))
                 
                 
                 # room = "labpc_" + str(sort_labpc_id) # get the room of the board
@@ -260,22 +273,30 @@ class SetControlBoardByBoardIDAPI(APIView):
                 #     },
                 # }
                 # )
-                link = "http://" + l.ipaddr + ":" + l.port + "/api/control/boards/"
-                link = gen_url(link,{"cmd":"power","arg":power,"pcd_ip":sort_pcd_ip,"labpc_id":sort_labpc_id,"relay_id":sort_relay_id})
-                print(link)
-                r = requests.get(link).json()
+                url = "http://%s:%d/api/control/relay/"%(str(l.ipaddr),int(l.port))
+                params = {"cmd":"control","arg":control,"pcd_ip":sort_pcd_ip,"labpc_id":sort_labpc_id,"relay_id":sort_relay_id}
+                try:
+                    r = requests.get(url,params=params).json()
+                except:
+                    raise ValueError("Cannot connect to LABPC")
                 print(json.dumps(r))
                 resp["messase"] = r
                 return Response(resp, status=status.HTTP_200_OK)
+            
             if sort_board_id is None :
-                raise ValueError({"ok": False,"error": "Need more input ex: board_id"})
-            b = Board.objects.get(id=int(sort_board_id))
+                raise ValueError("Need more input ex: board_id")
+            try:
+                b = Board.objects.get(id=int(sort_board_id))
+            except Board.DoesNotExist:
+                raise ValueError("Board is not exist")
+            except:
+                raise ValueError("Failed get board")
             if not b.isActivate :
-                raise ValueError({"ok": False,"error": "Board is not activate"})
+                raise ValueError("Board is not activate")
             if b.usingBy!= sort_using_by:
-                raise ValueError({"ok": False,"error": "Board is using by %s. Plz lock/unlock board to use."%(b.usingBy)})
+                raise ValueError("Board is using by %s. Plz lock/unlock board to use."%(b.usingBy))
             if not b.isShareControl:
-                raise ValueError({"ok": False,"error": "Board is not sharing"})
+                raise ValueError("Board is not sharing")
 
             # room = "labpc_" + str(b.LABPCOwner.user.id) # get the room of the board
             # resp['mess']= "send to room %s"%(room)
@@ -296,13 +317,15 @@ class SetControlBoardByBoardIDAPI(APIView):
             #         },
             #     }
             # )
-            link = "http://" + str(b.LABPCOwner.ipaddr) + ":" + str(b.LABPCOwner.port) + "/api/control/boards/?"
-            link = gen_url(link,{"cmd":"power","board_lab_id":b.boardLabID,"arg":power,"pcd_ip":b.PCDOwner.id,"labpc_id":b.LABPCOwner.id,"relay_id":b.powerSwitchRelayNumber})
-            print(link)
-            r = requests.get(link).json()
+            url = "http://%s:%d/api/control/boards/?"%(str(b.LABPCOwner.ipaddr),int(b.LABPCOwner.port) )
+            params = {"cmd":"control","board_lab_id":b.boardLabID,"control":control,"pcd_ip":b.PCDOwner.id,"labpc_id":b.LABPCOwner.id,"power_relay_id":b.powerSwitchRelayNumber,"boot_relay_id":b.accSwitchRelayNumber}
+            try:
+                r = requests.get(url,params=params).json()
+            except:
+                raise ValueError("Cannot connect to LABPC")
             return Response(r, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response((e), status=status.HTTP_400_BAD_REQUEST)
+            return Response({"ok": False,"error":str(e)}, status=status.HTTP_400_BAD_REQUEST)
     def post(self, request):
         print(request.data)
         return Response('OK', status=status.HTTP_200_OK)
@@ -320,24 +343,26 @@ def index(request):
     for b in bs:
         if b.LABPCOwner.id in ls:
             continue
-        link = "http://" + str(b.LABPCOwner.ipaddr) + ":" + str(b.LABPCOwner.port) + "/api/status/boards/?"
-        link = gen_url(link,{})
-        print(link)
+        url = "http://%s:%d/api/status/boards/?"%(str(b.LABPCOwner.ipaddr),int(b.LABPCOwner.port))
         try:
-            r = requests.get(link).json()
+            r = requests.get(url).json()
         except:
             r = {"ok":False}
         if r.get("ok") :
             ls.append(b.LABPCOwner.id)
             rbs = r.get("data")
             for rb in rbs:
-                print(rb)
                 try:
                     _b = Board.objects.get(LABPCOwner__id = b.LABPCOwner.id, boardLabID = rb["board_lab_id"])
-                    _b.statusPower = getPower(rb["power"])
+                    if rb["power"] is not None:
+                        _b.statusPower = getStatusControl(rb["power"])
+                    if rb["boot"] is not None:
+                        _b.statusBoot = getStatusControl(rb["boot"])
                     _b.save()
                 except Board.DoesNotExist:
                     print ("Labpc[{0} ip={2}] not exist boardLabID[{1}]".format(b.LABPCOwner.id,rb["board_lab_id"],b.LABPCOwner.ipaddr))
+                except :
+                    print("LAPBC Response wrong format")
     bs = Board.objects.all()                
     return render(request, "myboard/index.html",{"boards": bs})
 def boards(request):

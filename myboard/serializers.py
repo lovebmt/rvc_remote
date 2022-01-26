@@ -31,6 +31,7 @@ class GetBoardsSerializer(serializers.ModelSerializer):
             'name': board.displayName,
             'type': board.boardType,
             'status_power': "ON" if board.statusPower == Board.StatusPower.POWER_ON else "OFF",
+            'status_boot': "BOOT" if board.statusBoot == Board.StatusBoot.BOOT else "UNBOOT",
             'LABC_owner' : board.LABPCOwner.username,
             'PCD_address' : board.PCDOwner.ipaddr,
             'power_relay_number' : board.powerSwitchRelayNumber,
