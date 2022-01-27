@@ -30,24 +30,30 @@
       if (message.arg === 'on') {
         console.log(message)
         document.getElementById("cbox0").checked = true
-      } else if( message.arg === 'off'){
+      } else if (message.arg === 'off') {
         document.getElementById("cbox0").checked = false
-      }else if( message.arg === 'boot'){
+      } else if (message.arg === 'boot') {
         document.getElementById("cbox1").checked = false
-      }else if( message.arg === 'unboot'){
+      } else if (message.arg === 'unboot') {
         document.getElementById("cbox1").checked = true
       }
     }
   };
 
   labpcSocket.onclose = function (e) {
-    console.error('labpc socket closed unexpectedly');
+    alert('labpc socket closed unexpectedly');
   };
 
 
 
 </script>
-<textarea id="status-log" cols="100" rows="15"></textarea><br>
+</div>
+
+<div class="form-group">
+  <textarea class="form-control" id="status-log" rows="15"></textarea>
+ <input class="form-control" id="chat-message-input" type="text">
+</div>
+
 <div>
   <label class="switch">
     <input type="checkbox" id="cbox0">
@@ -88,7 +94,20 @@
   } else {
     document.getElementById("cbox0").checked = true
   }
-
+  document.querySelector('#chat-message-input').focus();
+  document.querySelector('#chat-message-input').onkeyup = function (e) {
+    if (e.keyCode === 13) {  // enter, return
+      const messageInputDom = document.querySelector('#chat-message-input');
+      const message = messageInputDom.value;
+      labpcSocket.send(JSON.stringify({
+        'message': message,
+        'from': username,
+        'to': 'all',
+        'evt': 'noti'
+      }));
+      messageInputDom.value = '';
+    }
+  };
   document.querySelector('#on-message-submit').onclick = function (e) {
     console.log("click on");
     mess = JSON.stringify({
@@ -140,7 +159,7 @@
     }));
   };
 
-// boot btn
+  // boot btn
   document.querySelector('#boot-message-submit').onclick = function (e) {
     mess = JSON.stringify({
       'cmd': 'control',
