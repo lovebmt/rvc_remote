@@ -27,7 +27,16 @@ class messageClientConsumer(WebsocketConsumer):
 
         async_to_sync(self.channel_layer.group_add)(self.room_group_name, self.channel_name)
         self.accept()
-
+        self.send( #send in socket
+            text_data=json.dumps(
+                {
+                    "from": "server",
+                    "to": "user",
+                    "message": "connect success",
+                    "evt": "connect",
+                }
+            )
+        )
     def disconnect(self, close_code):
         """Handling disconnect request."""
         async_to_sync(self.channel_layer.group_discard)(self.room_group_name, self.channel_name)

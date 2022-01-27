@@ -1,223 +1,193 @@
 {% extends 'myboard/base.html' %}
-<style>
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 60px;
-  height: 34px;
-}
-
-.switch input { 
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  -webkit-transition: .4s;
-  transition: .4s;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 26px;
-  width: 26px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  -webkit-transition: .4s;
-  transition: .4s;
-}
-
-input:checked + .slider {
-  background-color: #2196F3;
-}
-
-input:focus + .slider {
-  box-shadow: 0 0 1px #2196F3;
-}
-
-input:checked + .slider:before {
-  -webkit-transform: translateX(26px);
-  -ms-transform: translateX(26px);
-  transform: translateX(26px);
-}
-
-/* Rounded sliders */
-.slider.round {
-  border-radius: 34px;
-}
-
-.slider.round:before {
-  border-radius: 50%;
-}
-</style>
+{% load static %}
 {% block content %}
-    {{ room_name|json_script:"room-name" }}
-    {{ my_token|json_script:"my-token" }}
-    {{board_id | json_script:"board-id" }}
-    <script>
-
-        const roomName = JSON.parse(document.getElementById('room-name').textContent);
-        const myToken = JSON.parse(document.getElementById('my-token').textContent);
-
-        const labpcSocket = new WebSocket(
-            'ws://'
-            + window.location.host
-            + '/ws/myboard/'
-            + roomName
-            + '/?token='
-            + myToken
-        );
-
-        labpcSocket.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-                document.querySelector('#status-log').value += ('['+ data.from + '] ' + JSON.stringify(data.message).toString().replace(/\\/g, '') + '\n');
-                document.getElementById("status-log").scrollTop = document.getElementById("status-log").scrollHeight 
-
-            };
-
-        labpcSocket.onclose = function(e) {
-            console.error('labpc socket closed unexpectedly');
-        };
+<link rel="stylesheet" type="text/css" href="{% static 'myboard/room.css' %}">
+{{ room_name|json_script:"room-name" }}
+{{ my_token|json_script:"my-token" }}
+{{board | json_script:"board" }}
 
 
+<script>
 
-    </script>
+  const roomName = JSON.parse(document.getElementById('room-name').textContent);
+  const myToken = JSON.parse(document.getElementById('my-token').textContent);
+
+  const labpcSocket = new WebSocket(
+    'ws://'
+    + window.location.host
+    + '/ws/myboard/'
+    + roomName
+    + '/?token='
+    + myToken
+  );
+
+  labpcSocket.onmessage = function (e) {
+    const data = JSON.parse(e.data);
+    document.querySelector('#status-log').value += ('[' + data.from + '] ' + JSON.stringify(data.message).toString().replace(/\\/g, '') + '\n');
+    document.getElementById("status-log").scrollTop = document.getElementById("status-log").scrollHeight
+    var message = JSON.parse(data.message);
+    if (message.cmd === 'control') {
+      if (message.arg === 'on') {
+        console.log(message)
+        document.getElementById("cbox0").checked = true
+      } else if( message.arg === 'off'){
+        document.getElementById("cbox0").checked = false
+      }else if( message.arg === 'boot'){
+        document.getElementById("cbox1").checked = false
+      }else if( message.arg === 'unboot'){
+        document.getElementById("cbox1").checked = true
+      }
+    }
+  };
+
+  labpcSocket.onclose = function (e) {
+    console.error('labpc socket closed unexpectedly');
+  };
+
+
+
+</script>
 <textarea id="status-log" cols="100" rows="15"></textarea><br>
-<style>
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 90px;
-      height: 34px;
-    }
-    
-    .switch input { 
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: #ccc;
-      -webkit-transition: .4s;
-      transition: .4s;
-    }
-    
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 26px;
-      width: 26px;
-      left: 4px;
-      bottom: 4px;
-      background-color: white;
-      -webkit-transition: .4s;
-      transition: .4s;
-    }
-    
-    input:checked + .slider {
-      background-color: #21f333;
-    }
-    
-    input:focus + .slider {
-      box-shadow: 0 0 1px #21f333;
-    }
-    
-    input:checked + .slider:before {
-      -webkit-transform: translateX(56px);
-      -ms-transform: translateX(56px);
-      transform: translateX(56px);
-    }
-    /*------ ADDED CSS ---------*/
-    .on
-    {
-    display: none;
-    }
-
-    .on, .off
-    {
-    color: white;
-    position: absolute;
-    transform: translate(-50%,-50%);
-    top: 50%;
-    left: 50%;
-    font-size: 15x;
-    font-family: Verdana, sans-serif;
-    }
-    input:checked+ .slider .on
-    {display: block;}
-
-    input:checked + .slider .off
-    {display: none;}
-    /* Rounded sliders */
-    .slider.round {
-      border-radius: 34px;
-    }
-    
-    .slider.round:before {
-      border-radius: 50%;
-    }
-    </style>
-
 <div>
-    <label class="switch">
-        <input type="checkbox" checked>
-        <div class="slider round">
-            <!--ADDED HTML -->
-            <span class="on"  id="off-message-submit">ON</span>
-            <span class="off"  id="on-message-submit">OFF</span>
-            <!--END-->
-           </div>
-      </label>
+  <label class="switch">
+    <input type="checkbox" id="cbox0">
+    <div class="slider round">
+      <!--ADDED HTML -->
+      <span class="on" id="off-message-submit">ON</span>
+      <span class="off" id="on-message-submit">OFF</span>
+      <!--END-->
+    </div>
+  </label>
+</div>
+<div>
+  <label class="switch">
+    <input type="checkbox" id="cbox1">
+    <div class="slider round">
+      <!--ADDED HTML -->
+      <span class="on" id="boot-message-submit">BOOT</span>
+      <span class="off" id="unboot-message-submit">UNBOOT</span>
+      <!--END-->
+    </div>
+  </label>
 </div>
 <p>{{ output }}</p>
 <script>
-    var username = "{{user.username}}";
-    const board_id = JSON.parse(document.getElementById('board-id').textContent);
-            document.querySelector('#on-message-submit').onclick = function(e) {
-            mess = JSON.stringify({
-                'cmd':'power',
-                'arg':'on',
-                'board_id' : board_id
-            })
-            labpcSocket.send(JSON.stringify({
-                'message': mess.toString(),
-                'from': username,
-                'to' : 'labpc',
-                'evt' : 'request'
-            }));
-            messageInputDom.value = '';
-        };
-        document.querySelector('#off-message-submit').onclick = function(e) {
-            mess = JSON.stringify({
-                'cmd':'power',
-                'arg':'off',
-                'board_id' : board_id
-            })
-            labpcSocket.send(JSON.stringify({
-                'message': mess.toString(),
-                'from': username,
-                'to' : 'labpc',
-                'evt' : 'request'
-            }));
-            messageInputDom.value = '';
-        };
+  function httpGet(theUrl) {
+    var xmlHttp = new XMLHttpRequest();
+    xmlHttp.open("GET", theUrl, false); // false for synchronous request
+    xmlHttp.send(null);
+    return xmlHttp.responseText;
+  }
+  var username = "{{user.username}}";
+  var board = JSON.parse(document.getElementById('board').textContent);
+  board_id = board[0]
+  board_power = board[1]
+  board_boot = board[2]
+  if (board_power === 0) {
+    document.getElementById("cbox0").checked = false
+  } else {
+    document.getElementById("cbox0").checked = true
+  }
 
+  document.querySelector('#on-message-submit').onclick = function (e) {
+    console.log("click on");
+    mess = JSON.stringify({
+      'cmd': 'control',
+      'arg': 'on',
+      'board_id': board_id
+    })
+    labpcSocket.send(JSON.stringify({
+      'message': mess.toString(),
+      'from': username,
+      'to': 'labpc',
+      'evt': 'request'
+    }));
+    responseText = httpGet(`/myboard/api/control/boards/share/?board_id=${board_id}&control=on`);
+    jsRespose = JSON.parse(responseText)
+    if (!jsRespose.ok) {
+      alert(jsRespose.error);
+    }
+    labpcSocket.send(JSON.stringify({
+      'message': responseText,
+      'from': 'labpc',
+      'to': username,
+      'evt': 'noti'
+    }));
+  };
+  document.querySelector('#off-message-submit').onclick = function (e) {
+    console.log("click offfffffffff ");
+    mess = JSON.stringify({
+      'cmd': 'control',
+      'arg': 'off',
+      'board_id': board_id
+    })
+    labpcSocket.send(JSON.stringify({
+      'message': mess.toString(),
+      'from': username,
+      'to': 'labpc',
+      'evt': 'request'
+    }));
+    responseText = httpGet(`/myboard/api/control/boards/share/?board_id=${board_id}&control=off`);
+    jsRespose = JSON.parse(responseText)
+    if (!jsRespose.ok) {
+      alert(jsRespose.error);
+    }
+    labpcSocket.send(JSON.stringify({
+      'message': responseText,
+      'from': 'labpc',
+      'to': username,
+      'evt': 'noti'
+    }));
+  };
+
+// boot btn
+  document.querySelector('#boot-message-submit').onclick = function (e) {
+    mess = JSON.stringify({
+      'cmd': 'control',
+      'arg': 'boot',
+      'board_id': board_id
+    })
+    labpcSocket.send(JSON.stringify({
+      'message': mess.toString(),
+      'from': username,
+      'to': 'labpc',
+      'evt': 'request'
+    }));
+    responseText = httpGet(`/myboard/api/control/boards/share/?board_id=${board_id}&control=boot`);
+    jsRespose = JSON.parse(responseText)
+    if (!jsRespose.ok) {
+      alert(jsRespose.error);
+    }
+    labpcSocket.send(JSON.stringify({
+      'message': responseText,
+      'from': 'labpc',
+      'to': username,
+      'evt': 'noti'
+    }));
+  };
+  document.querySelector('#unboot-message-submit').onclick = function (e) {
+    mess = JSON.stringify({
+      'cmd': 'control',
+      'arg': 'unboot',
+      'board_id': board_id
+    })
+    labpcSocket.send(JSON.stringify({
+      'message': mess.toString(),
+      'from': username,
+      'to': 'labpc',
+      'evt': 'request'
+    }));
+    responseText = httpGet(`/myboard/api/control/boards/share/?board_id=${board_id}&control=unboot`);
+    jsRespose = JSON.parse(responseText)
+    if (!jsRespose.ok) {
+      alert(jsRespose.error);
+    }
+    labpcSocket.send(JSON.stringify({
+      'message': responseText,
+      'from': 'labpc',
+      'to': username,
+      'evt': 'noti'
+    }));
+  };
 </script>
 {% endblock %}

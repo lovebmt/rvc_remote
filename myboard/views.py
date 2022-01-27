@@ -76,8 +76,7 @@ class GetShareBoardsAPI(APIView):
             sort_board_type = request.GET.get('board_type', None)
             sort_board_lab_id = request.GET.get('board_lab_id', None)
 
-
-            # The params tpsort by
+            # The params sort by
             sort_params = {}
             set_if_not_none(sort_params, 'id', sort_board_id)
             set_if_not_none(sort_params, 'usingBy', sort_using_by)
@@ -85,35 +84,6 @@ class GetShareBoardsAPI(APIView):
             set_if_not_none(sort_params, 'PCDOwner__ipaddr', sort_pcd_ip)
             set_if_not_none(sort_params, 'boardType', sort_board_type)
             set_if_not_none(sort_params, 'boardLabID', sort_board_lab_id)
-            
-            # if None not in [sort_board_id]:
-            #     b = Board.objects.get(id=sort_board_id,  isShareControl = True,isActivate =True)
-            #     link = "http://" + str(b.LABPCOwner.ipaddr) + ":" + str(b.LABPCOwner.port) + "/api/status/boards/?"
-            #     link = gen_url(link,{"board_lab_id":b.boardLabID})
-            #     print(link)
-            #     r = requests.get(link)
-            #     print(r.text)
-            #     #save DB
-            # elif None not in [sort_labpc_id,sort_board_lab_id]:
-            #     b = Board.objects.get(boardLabID=sort_board_lab_id, LABPCOwner__id = sort_labpc_id, isShareControl = True,isActivate =True)
-            #     link = "http://" + str(b.LABPCOwner.ipaddr) + ":" + str(b.LABPCOwner.port) + "/api/status/boards/?"
-            #     link = gen_url(link,{"board_lab_id":sort_board_lab_id})
-            #     print(link)
-            #     r = requests.get(link)
-            #     print(r.text)
-            #     #save DB
-            # elif None not in [sort_labpc_id,sort_pcd_ip]:
-
-            #     l = LABPC.objects.get(id=sort_labpc_id)
-            #     link = "http://" + str(l.ipaddr) + ":" + str(l.port) + "/api/status/boards/?"
-            #     link = gen_url(link,{"pcd_ip":sort_pcd_ip})
-            #     print(link)
-            #     r = requests.get(link)
-            #     print(r.text)
-            #     #save DB return share board
-            #     #save
-            #     bs = Board.objects.filter(LABPCOwner__id = sort_labpc_id, PCDOwner__ipaddr=sort_pcd_ip,  isShareControl = True,isActivate =True)
-            # elif None not in [sort_labpc_id]:
 
             bs = Board.objects.filter(**sort_params,  isShareControl = True,isActivate =True)
             ls = []
@@ -338,8 +308,10 @@ def index(request):
         request: request message.
 
     """
-    bs = Board.objects.all()
+    bs = Board.objects.filter(isShareControl = True,isActivate =True)
     ls = []
+    data = {}
+    data["error"]= []
     for b in bs:
         if b.LABPCOwner.id in ls:
             continue
@@ -347,7 +319,7 @@ def index(request):
         try:
             r = requests.get(url).json()
         except:
-            r = {"ok":False}
+            r = {"ok":False,"error":"%s not respond"%(url)}
         if r.get("ok") :
             ls.append(b.LABPCOwner.id)
             rbs = r.get("data")
@@ -363,8 +335,11 @@ def index(request):
                     print ("Labpc[{0} ip={2}] not exist boardLabID[{1}]".format(b.LABPCOwner.id,rb["board_lab_id"],b.LABPCOwner.ipaddr))
                 except :
                     print("LAPBC Response wrong format")
-    bs = Board.objects.all()                
-    return render(request, "myboard/index.html",{"boards": bs})
+        else:
+            data["error"].append(r.get("error"))  
+    bs = Board.objects.filter(isShareControl = True,isActivate =True)  
+    data["boards"] = bs 
+    return render(request, "myboard/index.html",data)
 def boards(request):
     return render(request, "myboard/boards.html")
 import random
@@ -399,6 +374,6 @@ def room(request, room_name,board_id):
         request, "myboard/room.html", {
             "room_name": room_name,
             "my_token": token.key,
-            "board_id":board_id,
+            "board":[b.id,b.statusPower,b.statusBoot],
         }
     )
