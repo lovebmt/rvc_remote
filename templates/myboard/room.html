@@ -51,7 +51,7 @@
 
 <div class="form-group">
   <textarea class="form-control" id="status-log" rows="5"></textarea>
- <input class="form-control" id="chat-message-input" type="text" placeholder="[Text here, enter to send message]">
+ <input class="form-control" id="chat-message-input" type="text">
 </div>
 <!-- 
 <div>
@@ -104,6 +104,7 @@
       messageInputDom.value = '';
     }
   };
+  //on btn
   document.querySelector('#on-message-submit').onclick = function (e) {
     console.log("click on");
     mess = JSON.stringify({
