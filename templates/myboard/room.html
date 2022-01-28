@@ -51,28 +51,44 @@
 
 <div class="form-group">
   <textarea class="form-control" id="status-log" rows="5"></textarea>
- <input class="form-control" id="chat-message-input" type="text" placeholder="[Text here, enter to send message]">
+ <input class="form-control" id="chat-message-input" type="text" placeholder="Text here, enter to send.">
 </div>
-
-<div>
-  <label class="switch">
-    <input type="checkbox" id="cbox0">
-    <div class="slider round">
-      <span class="on" id="off-message-submit">ON</span>
-      <span class="off" id="on-message-submit">OFF</span>
-    </div>
-  </label>
-</div>
-<div>
-  <label class="switch">
-    <input type="checkbox" id="cbox1">
-    <div class="slider round">
-      <span class="on" id="boot-message-submit">BOOT</span>
-      <span class="off" id="unboot-message-submit">UNBOOT</span>
-    </div>
-  </label>
-</div> 
-<p>{{ output }}</p>
+<script>
+  document.querySelector('#chat-message-input').focus();
+  document.querySelector('#chat-message-input').onkeyup = function (e) {
+    if (e.keyCode === 13) {  // enter, return
+      const messageInputDom = document.querySelector('#chat-message-input');
+      const message = messageInputDom.value;
+      labpcSocket.send(JSON.stringify({
+        'message': message,
+        'from': username,
+        'to': 'all',
+        'evt': 'noti'
+      }));
+      messageInputDom.value = '';
+    }
+  };
+</script>
+<!-- <div class="d-flex justify-content-around">
+  <div>
+    <label class="switch">
+      <input type="checkbox" id="cbox0">
+      <div class="slider round">
+        <span class="on" id="off-message-submit">ON</span>
+        <span class="off" id="on-message-submit">OFF</span>
+      </div>
+    </label>
+  </div>
+  <div>
+    <label class="switch">
+      <input type="checkbox" id="cbox1">
+      <div class="slider round">
+        <span class="on" id="boot-message-submit">BOOT</span>
+        <span class="off" id="unboot-message-submit">UNBOOT</span>
+      </div>
+    </label>
+  </div> 
+</div> -->
 <script>
   function httpGet(theUrl) {
     var xmlHttp = new XMLHttpRequest();
@@ -90,20 +106,7 @@
   } else {
     document.getElementById("cbox0").checked = true
   }
-  document.querySelector('#chat-message-input').focus();
-  document.querySelector('#chat-message-input').onkeyup = function (e) {
-    if (e.keyCode === 13) {  // enter, return
-      const messageInputDom = document.querySelector('#chat-message-input');
-      const message = messageInputDom.value;
-      labpcSocket.send(JSON.stringify({
-        'message': message,
-        'from': username,
-        'to': 'all',
-        'evt': 'noti'
-      }));
-      messageInputDom.value = '';
-    }
-  };
+
   //on btn
   document.querySelector('#on-message-submit').onclick = function (e) {
     console.log("click on");
