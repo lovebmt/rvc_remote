@@ -187,7 +187,6 @@ class Board(models.Model):
         powerSwitchRelayNumber: power status.
         accSwitchRelayNumber: boot status.
         isActivate: is board on the lab PC?
-        isUsing: is board ready to use?
         isShareControl: share status.
 
     """
@@ -229,7 +228,7 @@ class Board(models.Model):
     powerSwitchRelayNumber = models.IntegerField(default=-1)
     accSwitchRelayNumber = models.IntegerField(default=-1)
     isActivate = models.BooleanField(default=False)
-    isUsing = models.BooleanField(default=False)
+    lock = models.BooleanField(default=False)
     isShareControl = models.BooleanField(default=True)
     usingBy = models.CharField(default = None ,max_length=255,editable=False,null=True,blank = True)
     statusPower = models.IntegerField(default=StatusPower.POWER_OFF,choices=StatusPower.choices)

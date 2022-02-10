@@ -6,7 +6,6 @@
 {{ my_token|json_script:"my-token" }}
 {{board | json_script:"board" }}
 
-
 <script>
 
   const roomName = JSON.parse(document.getElementById('room-name').textContent);
@@ -20,56 +19,41 @@
     + '/?token='
     + myToken
   );
-
+  const board = JSON.parse(document.getElementById('board').textContent);
   labpcSocket.onmessage = function (e) {
     const data = JSON.parse(e.data);
     document.querySelector('#status-log').value += ('[' + data.from + '] ' + JSON.stringify(data.message).toString().replace(/\\/g, '') + '\n');
     document.getElementById("status-log").scrollTop = document.getElementById("status-log").scrollHeight
-    var message = JSON.parse(data.message);
-    if (message.cmd === 'control') {
-      if (message.arg === 'on') {
-        console.log(message)
-        document.getElementById("cbox0").checked = true
-      } else if (message.arg === 'off') {
-        document.getElementById("cbox0").checked = false
-      } else if (message.arg === 'boot') {
-        document.getElementById("cbox1").checked = false
-      } else if (message.arg === 'unboot') {
-        document.getElementById("cbox1").checked = true
+    try{
+      var message = JSON.parse(data.message);
+      if (message.cmd === 'control'   && message.board_id===board[0]) {
+        if (message.arg === 'on') {
+          document.getElementById("cbox0").checked = true
+        } else if (message.arg === 'off') {
+          document.getElementById("cbox0").checked = false
+        } else if (message.arg === 'boot') {
+          document.getElementById("cbox1").checked = true
+        } else if (message.arg === 'unboot') {
+          document.getElementById("cbox1").checked = false
+        }
       }
+
+    }catch(e) {
+        console.log(e); // error in the above string (in this case, yes)!
     }
   };
 
   labpcSocket.onclose = function (e) {
     alert('labpc socket closed unexpectedly');
   };
-
-
-
 </script>
-</div>
+
 
 <div class="form-group">
-  <textarea class="form-control" id="status-log" rows="5"></textarea>
- <input class="form-control" id="chat-message-input" type="text" placeholder="Text here, enter to send.">
+  <label class="form-label">Console log</label>
+  <textarea class="form-control" id="status-log" rows="10"></textarea>
 </div>
-<script>
-  document.querySelector('#chat-message-input').focus();
-  document.querySelector('#chat-message-input').onkeyup = function (e) {
-    if (e.keyCode === 13) {  // enter, return
-      const messageInputDom = document.querySelector('#chat-message-input');
-      const message = messageInputDom.value;
-      labpcSocket.send(JSON.stringify({
-        'message': message,
-        'from': username,
-        'to': 'all',
-        'evt': 'noti'
-      }));
-      messageInputDom.value = '';
-    }
-  };
-</script>
-<!-- <div class="d-flex justify-content-around">
+<div class="d-flex justify-content-around">
   <div>
     <label class="switch">
       <input type="checkbox" id="cbox0">
@@ -83,32 +67,16 @@
     <label class="switch">
       <input type="checkbox" id="cbox1">
       <div class="slider round">
-        <span class="on" id="boot-message-submit">BOOT</span>
-        <span class="off" id="unboot-message-submit">UNBOOT</span>
+        <span class="on" id="unboot-message-submit">BOOT</span>
+        <span class="off" id="boot-message-submit">UNBOOT</span>
       </div>
     </label>
   </div> 
-</div> -->
+</div>
 <script>
-  function httpGet(theUrl) {
-    var xmlHttp = new XMLHttpRequest();
-    xmlHttp.open("GET", theUrl, false); // false for synchronous request
-    xmlHttp.send(null);
-    return xmlHttp.responseText;
-  }
-  var username = "{{user.username}}";
-  var board = JSON.parse(document.getElementById('board').textContent);
-  board_id = board[0]
-  board_power = board[1]
-  board_boot = board[2]
-  if (board_power === 0) {
-    document.getElementById("cbox0").checked = false
-  } else {
-    document.getElementById("cbox0").checked = true
-  }
-
-  //on btn
-  document.querySelector('#on-message-submit').onclick = function (e) {
+  var otherCheckbox = document.querySelector('input[id="cbox0"]');
+  otherCheckbox.addEventListener('change', () => {
+  if(otherCheckbox.checked) {
     console.log("click on");
     mess = JSON.stringify({
       'cmd': 'control',
@@ -132,9 +100,8 @@
       'to': username,
       'evt': 'noti'
     }));
-  };
-  document.querySelector('#off-message-submit').onclick = function (e) {
-    console.log("click offfffffffff ");
+  } else {
+    console.log("click off ");
     mess = JSON.stringify({
       'cmd': 'control',
       'arg': 'off',
@@ -157,34 +124,34 @@
       'to': username,
       'evt': 'noti'
     }));
-  };
-
-  // boot btn
-  document.querySelector('#boot-message-submit').onclick = function (e) {
+  }
+});
+var bootCheckbox = document.querySelector('input[id="cbox1"]');
+bootCheckbox.addEventListener('change', () => {
+  if(bootCheckbox.checked) {
     mess = JSON.stringify({
-      'cmd': 'control',
-      'arg': 'boot',
-      'board_id': board_id
-    })
-    labpcSocket.send(JSON.stringify({
-      'message': mess.toString(),
-      'from': username,
-      'to': 'labpc',
-      'evt': 'request'
-    }));
-    responseText = httpGet(`/myboard/api/control/boards/share/?board_id=${board_id}&control=boot`);
-    jsRespose = JSON.parse(responseText)
-    if (!jsRespose.ok) {
-      alert(jsRespose.error);
-    }
-    labpcSocket.send(JSON.stringify({
-      'message': responseText,
-      'from': 'labpc',
-      'to': username,
-      'evt': 'noti'
-    }));
-  };
-  document.querySelector('#unboot-message-submit').onclick = function (e) {
+        'cmd': 'control',
+        'arg': 'boot',
+        'board_id': board_id
+      })
+      labpcSocket.send(JSON.stringify({
+        'message': mess.toString(),
+        'from': username,
+        'to': 'labpc',
+        'evt': 'request'
+      }));
+      responseText = httpGet(`/myboard/api/control/boards/share/?board_id=${board_id}&control=boot`);
+      jsRespose = JSON.parse(responseText)
+      if (!jsRespose.ok) {
+        alert(jsRespose.error);
+      }
+      labpcSocket.send(JSON.stringify({
+        'message': responseText,
+        'from': 'labpc',
+        'to': username,
+        'evt': 'noti'
+      }));
+  }else {
     mess = JSON.stringify({
       'cmd': 'control',
       'arg': 'unboot',
@@ -207,6 +174,37 @@
       'to': username,
       'evt': 'noti'
     }));
-  };
+  }
+});
+</script>
+<script>
+  function httpGet(theUrl) {
+    var xmlHttp = new XMLHttpRequest();
+    xmlHttp.open("GET", theUrl, false); // false for synchronous request
+    xmlHttp.send(null);
+    return xmlHttp.responseText;
+  }
+  
+  var username = "{{user.username}}";
+  window.onload = function()
+  {
+    console.log("hello")
+  board_id = board[0]
+  board_power = board[1]
+  board_boot = board[2]
+  if (board_power === 0) {
+    document.getElementById("cbox0").checked = false
+  } else {
+    document.getElementById("cbox0").checked = true
+  } 
+  console.log(board_boot)
+  if (board_boot === 0) {
+    document.getElementById("cbox1").checked = true
+  } else {
+    document.getElementById("cbox1").checked = false
+  }
+};
+
+   
 </script>
 {% endblock %}

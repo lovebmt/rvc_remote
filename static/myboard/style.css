@@ -12,11 +12,11 @@ body {
 }
 
   .err {
+    text-align: center;
     color: #ffffff;
     font-family: 'Nunito Sans', sans-serif;
     font-size: 11rem;
-    position:absolute;
-    left: 20%;
+    left: 16%;
     top: 8%;
   }
 
