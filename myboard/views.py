@@ -211,25 +211,6 @@ class SetControlBoardAPI(APIView):
             if not b.isShareControl:
                 raise ValueError("Board is not sharing")
 
-            # room = "labpc_" + str(b.LABPCOwner.user.id) # get the room of the board
-            # resp['mess']= "send to room %s"%(room)
-            # channel_layer = get_channel_layer()
-            # async_to_sync(channel_layer.group_send)(
-            #     room,
-            #     {
-            #         "type": "room_message",
-            #         "from": sort_using_by,
-            #         "to" : "labpc",
-            #         "evt": "request",
-            #         "message": {
-            #             "cmd": "power",
-            #             "arg": power,
-            #             "board_id": b.id,
-            #             "pcd_id": b.PCDOwner.id,
-            #             "relay_id" : b.powerSwitchRelayNumber
-            #         },
-            #     }
-            # )
             url = "http://%s:%d/api/control/boards/?" % (
                 str(b.LABPCOwner.ipaddr), int(b.LABPCOwner.port))
             params = {"cmd": "control", "board_lab_id": b.boardLabID, "control": control, "pcd_ip": b.PCDOwner.id,
@@ -238,6 +219,24 @@ class SetControlBoardAPI(APIView):
                 r = requests.get(url, params=params).json()
             except:
                 raise ValueError("Cannot connect to LABPC")
+
+            room = "labpc_" + str(b.LABPCOwner.id) # get the room of the board
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                room,
+                {
+                    "type": "room_message",
+                    "from": "Guest" if using_by == None else str(using_by),
+                    "to" : "client",
+                    "evt": "notify_control",
+                    "message": {
+                        "cmd": "control",
+                        "arg": control,
+                        "board_id": b.id
+                    },
+                }
+            )
+
             return Response(r, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"ok": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

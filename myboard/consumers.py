@@ -13,7 +13,6 @@ class messageClientConsumer(WebsocketConsumer):
         handle: request ID from user.
 
     """
-    handle = 0
 
     def connect(self):
         """Handling connect request."""
@@ -54,9 +53,8 @@ class messageClientConsumer(WebsocketConsumer):
             mfrom = text_data_json.get("from",None)
             to = text_data_json.get("to","all")
             evt = text_data_json.get("evt",None)
-            handle = text_data_json.get("handle",None)
 
-            print("[{0}->{1}:{2}] {3}\n".format(mfrom,to,handle,str(message)))
+            print("[{0}->{1}:{2}] {3}\n".format(mfrom,to,evt,str(message)))
             if evt == "connect":
                 return ""
             async_to_sync(self.channel_layer.group_send)(
@@ -66,6 +64,7 @@ class messageClientConsumer(WebsocketConsumer):
                     "from": mfrom,
                     "to" : to,
                     "message": message,
+                    "evt":evt
                 }
             )
 
@@ -79,14 +78,13 @@ class messageClientConsumer(WebsocketConsumer):
             event: event message.
 
         """
-        handle = self.handle + 1
         self.send( #send in socket
             text_data=json.dumps(
                 {
                     "from": event["from"],
                     "to": event["to"],
-                    "message": event["message"],
-                    "handle": handle,
+                    "evt":event["evt"],
+                    "message": event["message"]
                 }
             )
         )
